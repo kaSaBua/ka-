@@ -1,0 +1,95 @@
+举一个例子，在很多电商网站或者有支付场景的系统中，支持多种支付方式，比如使用银行卡，微信或者支付宝等，那么实际在支付系统内部，
+不同的支付方式需要请求不同的第三方接口，比如银行卡支付方式需要请求网联，微信支付需要调用微信的API，支付宝则使用支付宝的API。
+
+
+对于上面的场景，如果在没有使用设计模式时，我们的代码一般都是用下面的方式处理。
+
+public class PaymentService {
+
+    CreditService creditService;
+
+    WeChatService weChatService;
+
+    AlipayService alipayService;
+
+    public void payment(PaymentType paymentType, BigDecimal amount) {
+        if (PaymentType.Credit == paymentType) {
+            creditService.payment();
+        } else if (PaymentType.WECHAT == paymentType) {
+            weChatService.payment();
+        } else if (PaymentType.ALIPAY == paymentType) {
+            alipayService.payment();
+        } else {
+            throw new NotSupportPaymentException("paymentType not support");
+        }
+    }
+}
+
+enum PaymentType {
+    Credit, WECHAT, ALIPAY;
+}
+
+
+++++++++++++++++++++++++++
+这种使用if...else的方式虽然能支持现有的业务需求，但是当业务需求发生改变时，比如增加新的支付方式，或者将某一个支付方式下线，则需要对PaymentService进行修改，显然这种设计不符合开闭原则（对修改关闭，对扩展开放），修改之后需要重新对其他的支付方式进行测试。
+
+
+首先，我们需要将支付方式这一行为抽象为一个策略接口，代表支付方式的抽象
+
+public interface PaymentStrategy {
+
+    public void payment(BigDecimal amount);
+    
+}
+
+然后我们再针对需要支持的三种支付方式建立对应的策略实现类。
+
+银行卡支付策略
+public class CreditPaymentStrategy implements PaymentStrategy{
+    @Override
+    public void payment(BigDecimal amount) {
+        System.out.println("使用银行卡支付" + amount);
+        // 去调用网联接口
+    }
+}
+
+微信支付策略
+
+public class WechatPaymentStrategy implements PaymentStrategy{
+    @Override
+    public void payment(BigDecimal amount) {
+        System.out.println("使用微信支付" + amount);
+        // 调用微信支付API
+    }
+}
+然后重新实现我们的支付服务PaymentService
+public class PaymentService {
+    
+    /**
+    * 将strategy作为参数传递给支付服务
+    */
+    public void payment(PaymentStrategy strategy, BigDecimal amount) {
+        strategy.payment(amount);
+    }
+}
+
+发现了吗？我们将支付策略作为参数传递给支付服务，在支付服务中只需要按照运行时传的支付策略对象进行支付就可以了。
+
+我们来测试一下使用策略模式之后的代码。
+public class StrategyTest {
+
+    public static void main(String[] args) {
+
+        PaymentService paymentService = new PaymentService();
+
+        // 使用微信支付
+        paymentService.payment(new WechatPaymentStrategy(), new BigDecimal("100"));
+
+        //使用支付宝支付
+        paymentService.payment(new AlipayPaymentStrategy(), new BigDecimal("100"));
+
+    }
+}
+
+
+
